@@ -75,25 +75,28 @@ type TransferTxResult struct {
 	ToEntry     Entry    `json:"to_entry"`
 }
 
+// var txKey = struct{}{}
+
 // TransferTx performs a money transfer from one account to the other
 // It creates a transfer record, add account entries,
 // and update account balances within a single database transaction
-func (store *Store) TransferTx(
-	ctx context.Context,
-	arg TransferTxParams,
-) (TransferTxResult, error) {
+func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams,) (TransferTxResult, error) {
 	var result TransferTxResult
 
 	err := store.execTx(ctx, func(q *Queries) error {
 		var err error
 
+		// txName := ctx.Value(txKey)
+
 		//1. Create a transfer record
+		// fmt.Println(">> Executing transfer transaction:", txName)
 		result.Transfer, err = q.CreateTransfer(ctx, CreateTransferParams(arg))
 		if err != nil {
 			return err
 		}
 
 		//2. Create the account entries
+		// fmt.Println(">> Executing entry 1:", txName)
 		result.FromEntry, err = q.CreateEntry(ctx, CreateEntryParams{
 			AccountID: arg.FromAccountID,
 			Amount:    -arg.Amount,
@@ -102,6 +105,7 @@ func (store *Store) TransferTx(
 			return err
 		}
 
+		// fmt.Println(">> Executing entry 2:", txName)
 		result.ToEntry, err = q.CreateEntry(ctx, CreateEntryParams{
 			AccountID: arg.ToAccountID,
 			Amount:    arg.Amount,
@@ -111,6 +115,54 @@ func (store *Store) TransferTx(
 		}
 
 		//TODO: update account balance
+		// the query GetAccount just a normal select query, 
+		// so it doesn't block the transaction from the other queries on the same table
+		// thus, we need to lock the account row using SELECT ... FOR UPDATE
+		// fmt.Println(">> Get Account 1 for update", txName)
+		// account1, err:= q.GetAccountForUpdate(ctx, arg.FromAccountID)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// // fmt.Println(">> Excute update for Account 1", txName)
+		// result.FromAccount, err = q.UpdateAccount(ctx, UpdateAccountParams{
+		// 	ID: arg. FromAccountID,
+		// 	Balance: account1.Balance - arg.Amount,
+		// })
+		// if err != nil {
+		// 	return err
+		// }
+
+		// // fmt.Println(">> Get Account 2 for update", txName)
+		// account2, err := q.GetAccountForUpdate(ctx, arg.ToAccountID)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// // fmt.Println(">> Excute update for Account 2", txName)
+		// result.ToAccount, err = q.UpdateAccount(ctx, UpdateAccountParams{
+		// 	ID: arg.ToAccountID,
+		// 	Balance: account2.Balance + arg.Amount,
+		// })
+		// if err != nil {
+		// 	return err
+		// }
+
+		result.FromAccount, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
+			ID: arg.FromAccountID,
+			Amount: -arg.Amount,
+		})
+		if err != nil {
+			return err
+		}
+
+		result.ToAccount, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
+			ID: arg.ToAccountID,
+			Amount: arg.Amount,
+		})
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})
