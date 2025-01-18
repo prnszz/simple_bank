@@ -94,6 +94,14 @@ DB transaction(事务)是一个工作单元. 它具有以下四个属性:
 最后我们写一下测试用例`db/sqlc/store_test.go`, 来测试我们的事务操作
 
 ## lecture 7 DB TX lock
+什么事deadlock? 一个事务在等待另一个事务释放锁, 而另一个事务又在等待第一个事务释放锁. 这样就会导致死锁. 
 这一章节的debug思路比较重要. 主要是创建了一个map, 用来查看事务的状态.
 
 在`TransferTx`方法中, 我们使用`SELECT ... FOR UPDATE`来锁定行, 防止并发操作. 但是这样会导致数据库的性能下降, 因为锁定行会导致其他事务无法操作这行数据. 所以我们需要在`SELECT`语句后面加上`SKIP LOCKED`来跳过锁定行, 这样可以提高数据库的性能
+
+## lecture 8 avoid deadlock in transaction
+在account1 -> account2的转账操作中, 我们使用了`SELECT ... FOR UPDATE`来锁定行, 避免了这个事务的并发操作时的问题. 但是这并没有避免account2 -> account1的转账操作时的问题. 
+account2 -> account1进行转账操作时, 如果account1 -> account2的转账操作还没有完成, 那么account2 -> account1的转账操作就会等待account1 -> account2的转账操作完成, 这样就会导致死锁.
+我们的思路还是先修改test case, 然后再修改代码. 
+我们主要是需要需要确保所有的事务都是按照相同的顺序来锁定行. 例如: account1 -> account2的转账操作中, 我们先锁定account1, 再锁定account2. 
+account2 -> account1的转账操作中, 我们也是先锁定account1, 再锁定account2. 这样就可以避免死锁的问题.
