@@ -156,3 +156,44 @@ account2 -> account1的转账操作中, 我们也是先锁定account1, 再锁定
 1. 工作流配置
 - 在`.github/workflows`目录下创建一个`ci.yml`文件
 - 在`ci.yml`文件中配置工作流(推送到主分支或者pr时触发)
+
+## lecture 11 API server
+本节课主要是使用`Gin`框架来搭建一个API server, 并且实现了三个端点:
+1. 服务器结构设计
+```go
+type Server struct {
+    store *db.Store    // 数据库操作接口
+    router *gin.Engine // Gin路由引擎
+}
+```
+- 封装了数据库操作和HTTP路由
+- 通过 NewServer 函数初始化并注册路由
+
+2. API实现了三个端点:
+
+CreateAccount (POST /accounts):
+- 接收 JSON 请求体包含 owner 和 currency
+- 使用 binding 标签验证输入
+- 调用 store.CreateAccount 创建账户
+
+GetAccount (GET /accounts/:id):
+- 通过 URI 参数接收账户ID
+- 使用 binding 验证ID >= 1 
+- 处理 sql.ErrNoRows 返回404
+
+ListAccount (GET /accounts):
+- 查询参数实现分页(page_id, page_size)
+- 参数验证:页码>=1,每页5-10条
+- 计算 offset 实现分页查询
+
+3. 错误处理:
+```go
+func errorResponse(err error) gin.H {
+    return gin.H{"error": err.Error()}
+}
+```
+- 统一错误响应格式
+- 根据错误类型返回对应HTTP状态码
+
+
+
